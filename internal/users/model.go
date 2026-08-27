@@ -3,9 +3,9 @@ package users
 import "time"
 
 type User struct {
-	Id           string    `json:"id"`
+	ID           int       `json:"id"`
 	Username     string    `json:"username"`
-	PasswordHash string    `json:"password_hash"`
+	PasswordHash string    `json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
@@ -22,6 +22,10 @@ type LoginRequest struct {
 type CreateUserParams struct {
 	Username     string
 	PasswordHash string
+}
+
+type CreateResponse struct {
+	ID int `json:"id"`
 }
 
 type LoginResponse struct {

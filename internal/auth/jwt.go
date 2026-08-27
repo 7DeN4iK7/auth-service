@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/7DeN4iK7/auth-service/internal/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -16,9 +17,9 @@ type JWTService struct {
 	secret []byte
 }
 
-func NewJWT(secret string) *JWTService {
+func NewJWT(cfg config.JWTConfig) *JWTService {
 	return &JWTService{
-		secret: []byte(secret),
+		secret: []byte(cfg.Secret),
 	}
 }
 

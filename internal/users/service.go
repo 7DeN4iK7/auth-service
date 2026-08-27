@@ -3,18 +3,25 @@ package users
 import (
 	"context"
 	"errors"
-	"strconv"
+	"unicode/utf8"
 
 	"github.com/7DeN4iK7/auth-service/internal/auth"
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	maxUsernameLength = 32
+	maxPasswordLength = 72
+)
+
 var (
-	ErrNoPassword        = errors.New("No password entered")
-	ErrNoUsername        = errors.New("No username entered")
-	ErrUserAlreadyExists = errors.New("User already exists")
-	ErrWrongPassword     = errors.New("Wrong password")
-	ErrGeneratingJWT     = errors.New("Error generating JWT")
+	ErrNoPassword        = errors.New("no password entered")
+	ErrNoUsername        = errors.New("no username entered")
+	ErrTooLongPassword   = errors.New("password is too long")
+	ErrTooLongUsername   = errors.New("username is too long")
+	ErrUserAlreadyExists = errors.New("user already exists")
+	ErrWrongPassword     = errors.New("wrong password")
+	ErrGeneratingJWT     = errors.New("error generating JWT")
 )
 
 type UserRepository interface {
@@ -37,8 +44,16 @@ func (s *Service) CreateUser(ctx context.Context, req RegisterRequest) (int, err
 		return 0, ErrNoPassword
 	}
 
+	if utf8.RuneCountInString(req.Password) > maxPasswordLength {
+		return 0, ErrTooLongPassword
+	}
+
 	if req.Username == "" {
 		return 0, ErrNoUsername
+	}
+
+	if utf8.RuneCountInString(req.Username) > maxUsernameLength {
+		return 0, ErrTooLongUsername
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -83,8 +98,7 @@ func (s *Service) LoginUser(ctx context.Context, r LoginRequest) (string, error)
 		return "", ErrWrongPassword
 	}
 
-	id, _ := strconv.Atoi(user.Id)
-	jwt, err := s.JWT.GenerateToken(id)
+	jwt, err := s.JWT.GenerateToken(user.ID)
 	if err != nil {
 		return "", ErrGeneratingJWT
 	}

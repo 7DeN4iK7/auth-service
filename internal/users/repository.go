@@ -6,14 +6,14 @@ import (
 	"fmt"
 
 	"github.com/7DeN4iK7/auth-service/internal/config"
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
-	ErrUniqueViolation = errors.New("Unique key violation")
-	ErrUserNotFound    = errors.New("User not found")
+	ErrUniqueViolation = errors.New("unique key violation")
+	ErrUserNotFound    = errors.New("user not found")
 )
 
 type Repository struct {
@@ -33,6 +33,10 @@ func NewRepository(cfg config.PostgresConfig) (*Repository, error) {
 	}
 
 	return &Repository{pool: pool}, nil
+}
+
+func (r *Repository) Close() {
+	r.pool.Close()
 }
 
 func (r *Repository) CreateUser(ctx context.Context, req CreateUserParams) (int, error) {
@@ -67,19 +71,19 @@ func (r *Repository) GetUserByUsername(ctx context.Context, username string) (Us
 	err := r.pool.QueryRow(
 		ctx,
 		`
-		SELECT id, password_hash, username
+		SELECT id, password_hash, username, created_at
 		FROM users
 		WHERE username = $1		
 		`,
 		username,
-	).Scan(&user.Id, &user.PasswordHash, &user.Username)
+	).Scan(&user.ID, &user.PasswordHash, &user.Username, &user.CreatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return User{}, ErrUserNotFound
-		} else {
-			return User{}, err
 		}
+
+		return User{}, err
 	}
 
 	return user, nil
@@ -91,19 +95,18 @@ func (r *Repository) GetUserByID(ctx context.Context, id int) (User, error) {
 	err := r.pool.QueryRow(
 		ctx,
 		`
-		SELECT id, password_hash, username
+		SELECT id, password_hash, username, created_at
 		FROM users
 		WHERE id = $1		
 		`,
 		id,
-	).Scan(&user.Id, &user.PasswordHash, &user.Username)
+	).Scan(&user.ID, &user.PasswordHash, &user.Username, &user.CreatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return User{}, ErrUserNotFound
-		} else {
-			return User{}, err
 		}
+		return User{}, err
 	}
 
 	return user, nil

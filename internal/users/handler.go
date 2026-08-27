@@ -24,34 +24,45 @@ func NewHandler(s UserService) *Handler {
 	return &Handler{Service: s}
 }
 
+func jsonResponse(w http.ResponseWriter, data any) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		slog.Error("failed to encode response", slog.Any("err", err))
+	}
+}
+
 func (h *Handler) CreateUser() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		decoder := json.NewDecoder(r.Body)
-
 		var request RegisterRequest
 
-		decoder.Decode(&request)
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
 
 		id, err := h.Service.CreateUser(r.Context(), request)
 		if err != nil {
 			slog.Error("Create user error", slog.Any("error", err))
 			switch {
-			case errors.Is(err, ErrNoPassword):
-				http.Error(w, "No password entered", http.StatusBadRequest)
-			case errors.Is(err, ErrNoUsername):
-				http.Error(w, "No username entered", http.StatusBadRequest)
+			case errors.Is(err, ErrNoPassword),
+				errors.Is(err, ErrNoUsername),
+				errors.Is(err, ErrTooLongPassword),
+				errors.Is(err, ErrTooLongUsername):
+				http.Error(w, err.Error(), http.StatusBadRequest)
 			case errors.Is(err, ErrUserAlreadyExists):
-				http.Error(w, "User already exists", http.StatusConflict)
+				http.Error(w, err.Error(), http.StatusConflict)
 			default:
-				http.Error(w, "Unknown error", http.StatusInternalServerError)
+				http.Error(w, "unknown error", http.StatusInternalServerError)
 			}
 
 			return
 		}
 
-		slog.Info("Created successful", slog.Any("id", id))
+		slog.Info("created successful", slog.Any("id", id))
 
-		w.Write([]byte("Created successful"))
+		w.WriteHeader(http.StatusCreated)
+		jsonResponse(w, CreateResponse{ID: id})
 	}
 }
 
@@ -66,16 +77,18 @@ func (h *Handler) LoginUser() http.HandlerFunc {
 
 		token, err := h.Service.LoginUser(r.Context(), request)
 		if err != nil {
-			slog.Error("Login error", slog.Any("err", err))
-			http.Error(w, "invalid credentials", http.StatusUnauthorized)
+			switch {
+			case errors.Is(err, ErrWrongPassword),
+				errors.Is(err, ErrUserNotFound):
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+			default:
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				slog.Error("Login error", slog.Any("err", err))
+			}
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-
-		json.NewEncoder(w).Encode(LoginResponse{
-			Token: token,
-		})
+		jsonResponse(w, LoginResponse{Token: token})
 	}
 }
 
@@ -83,17 +96,22 @@ func (h *Handler) UserInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := r.Context().Value(middleware.UserIDKey).(int)
 		if !ok {
-			http.Error(w, "Invalid user ID", http.StatusUnauthorized)
+			http.Error(w, "invalid user ID", http.StatusUnauthorized)
 			return
 		}
 
 		user, err := h.Service.GetUserByID(r.Context(), userID)
 		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			switch {
+			case errors.Is(err, ErrUserNotFound):
+				http.Error(w, err.Error(), http.StatusNotFound)
+			default:
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+			}
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(UserResponse{
+
+		jsonResponse(w, UserResponse{
 			Username:  user.Username,
 			CreatedAt: user.CreatedAt,
 		})

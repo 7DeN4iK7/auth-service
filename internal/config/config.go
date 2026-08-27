@@ -10,6 +10,7 @@ import (
 type Config struct {
 	PostgresCfg PostgresConfig
 	ServerCfg   ServerConfig
+	JwtCfg      JWTConfig
 }
 
 type PostgresConfig struct {
@@ -27,6 +28,10 @@ type ServerConfig struct {
 	WriteTimeout      time.Duration
 	ReadHeaderTimeout time.Duration
 	IdleTimeout       time.Duration
+}
+
+type JWTConfig struct {
+	Secret string
 }
 
 func New() (Config, error) {
@@ -59,6 +64,8 @@ func New() (Config, error) {
 	config.PostgresCfg.Password = os.Getenv("POSTGRES_PASSWORD")
 	config.PostgresCfg.Database = os.Getenv("POSTGRES_DB")
 	config.PostgresCfg.SSLMode = os.Getenv("POSTGRES_SSLMODE")
+
+	config.JwtCfg.Secret = os.Getenv("JWT_SECRET")
 
 	return config, nil
 }
