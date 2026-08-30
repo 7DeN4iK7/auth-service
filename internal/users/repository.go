@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/7DeN4iK7/auth-service/internal/config"
 	"github.com/jackc/pgx/v5"
@@ -29,6 +30,11 @@ func NewRepository(cfg config.PostgresConfig) (*Repository, error) {
 		cfg.Database,
 		cfg.SSLMode))
 	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := pool.Ping(ctx); err != nil {
 		return nil, err
 	}
 
